@@ -193,7 +193,7 @@ client = server.available();
         Serial.printf("Set Flame Detected... %s\n", Firebase.setBool(fbdo, "/Sensor Data/" + std::string(auth.token.uid.c_str()) + "/flame", flame) ? "ok" : fbdo.errorReason().c_str());
         count++;
       } else {
-         Serial.println("Firebasenot ready or internet dc");
+         Serial.println("Firebasenot ready");
       }
     }
   }
