@@ -26,7 +26,7 @@ WiFiClient client;
 // NOTE: For firebase, best to use millis instead of delay()
 unsigned long sendDataPrevMillis = 0;
 unsigned long count = 0;
-
+ bool isBluetoothInitialized = false;
 // Define the analog pins for the sensors
 #define MQ2_PIN 34
 #define MQ135_PIN 14
@@ -104,8 +104,9 @@ bool readFlame() {
 }
 
 void setup() {
+ 
   Serial.begin(115200);
-  SerialBT.begin("ESP32");
+  //SerialBT.begin("PYRONNOIA");
   WiFi.mode(WIFI_STA);
   // Set the flame sensor's digital output pin as an input
   pinMode(FLAME_PIN, INPUT);
@@ -115,18 +116,37 @@ void setup() {
 
 void loop() {
 
-  if (WiFi.status() != WL_CONNECTED && !Firebase.ready()) {
-    Serial.println("Internet dc");
-    bluetoothconnect();
-  } else {
+if (WiFi.status() != WL_CONNECTED) {
+    if (!isBluetoothInitialized) {
+        SerialBT.begin("PYRONNOIA");
+        isBluetoothInitialized = true;
+        if (!isBluetoothInitialized)
+        {  Serial.println("PYRONNOIA OFF");}
+        else
+        {Serial.println("PYRONNOIA ON");}
+    } 
+    //else if (!SerialBT.connected()) {
+    //    Serial.println("Waiting for Bluetooth connection...");
+    //    delay(10000);
+
+    //} 
+    else {
+        bluetoothconnect(); // check for incoming messages
+    }
+}
+else {
+    //isBluetoothInitialized = false;
     SerialBT.end();
-    ////
+    Serial.println("BT end");
+
+    
     if (!Firebase.ready()) {
       firebaseSetup();
-    } else {
-server.begin();
-client = server.available();
-           if (client) {
+    } 
+    else {
+          server.begin();
+          client = server.available();
+          if (client) {
         Serial.println("Client connected");
         while (client.connected()) {
         if (client.available()) 
@@ -169,8 +189,7 @@ client = server.available();
       else
       {}
 
-      
-
+    
       if (Firebase.ready() && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0)) {
         sendDataPrevMillis = millis();
 
@@ -193,7 +212,7 @@ client = server.available();
         Serial.printf("Set Flame Detected... %s\n", Firebase.setBool(fbdo, "/Sensor Data/" + std::string(auth.token.uid.c_str()) + "/flame", flame) ? "ok" : fbdo.errorReason().c_str());
         count++;
       } else {
-         Serial.println("Firebasenot ready");
+         //Serial.println("Firebasenot ready");
       }
     }
   }
@@ -219,11 +238,17 @@ bool connectToWifi() {
   return true;
 }
 
+
+
 void bluetoothconnect(){
   if (SerialBT.connected() && WiFi.status() != WL_CONNECTED) {
     Serial.println("Bluetooth is connected into serial.");
     delay(1000);
   }
+ // else
+ // {
+    
+  //}
   
   if (SerialBT.available() && SerialBT.connected() && WiFi.status() != WL_CONNECTED) {
     String message = SerialBT.readStringUntil('\n');
