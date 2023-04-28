@@ -44,13 +44,12 @@ bool startconn = true;
 // Define the pin for the IR flame sensor
 #define FLAME_PIN 32
 BluetoothSerial SerialBT;
-const char* prevSavedSsid = "";
-const char* prevSavedPassword = "";
-const char* ssid = "";
-const char* password = "";
-const char* savedssid = "";
-const char* savedpassword = "";
-
+const char* default_ssid = "my_default_ssid";
+const char* default_password = "my_default_password";
+const char* ssid ="";
+const char* password= "";
+//char* savedssid ="";
+//char* savedpassword= "";
 void firebaseSetup() {
   bool isConnectedtoFB = false;  // flag to keep track of connection status
   WiFi.begin(ssid, password);
@@ -118,13 +117,6 @@ bool readFlame() {
 }
 
 void setup() {
-  // Open the preferences file with a namespace of "wifi" and read-write access
-  preferences.begin("wifi", true);
-
-  // Load the saved SSID and password from preferences, or use default values
-  ssid = preferences.getString("ssid").c_str();
-  password = preferences.getString("password").c_str();
-  preferences.end();
   Serial.begin(115200);
   //SerialBT.begin("PYRONNOIA");
   WiFi.mode(WIFI_STA);
@@ -209,9 +201,9 @@ void loop() {
                 password = wifiPassword.c_str();
                 bool connected = connectToWifi();
                 if (!connected) {
-                  Serial.println("Invalid Wi-Fi credentials received");
+                  Serial.println("Invalid Wi-Fi credentials received 1");
                 } else {
-                  Serial.println("VALID Wi-Fi credentials received");
+                  Serial.println("VALID Wi-Fi credentials received 2");
                 }
               } else {
                 Serial.println("Invalid Wi-Fi credentials received");
@@ -261,11 +253,19 @@ bool connectToWifi() {
   if (!startconn) {
     WiFi.begin(ssid, password);
   } else {
-    loadWifiCredentials();
-    WiFi.begin(ssid, password);
-    Serial.println("USING SAVED CREDS");
-    Serial.println(ssid);
-    Serial.println(password);
+char ssid[32]; // assuming the length of the SSID is no more than 32 characters
+char password[64]; // assuming the length of the password is no more than 64 characters
+// Call the function to load saved credentials
+loadWiFiCredentials(ssid, password);
+// Use the loaded credentials to connect to WiFi
+WiFi.begin(ssid, password);
+Serial.println("USING SAVED CREDS");
+Serial.print("SSID: ");
+Serial.println(ssid);
+Serial.print("Password: ");
+Serial.println(password);
+WiFi.begin(ssid, password);
+
   }
   Serial.println("Connecting to Wi-Fi network");
   startTime = millis();
@@ -276,7 +276,8 @@ bool connectToWifi() {
     delay(1000);
     Serial.print("!");
   }
-  saveWiFiCredentials();
+
+
   return true;
 }
 
@@ -307,6 +308,7 @@ void bluetoothconnect() {
         if (!connected) {
           Serial.println("Invalid Wi-Fi credentials received");
         } else {
+          saveWiFiCredentials(ssid, password);
           Serial.println("VALID Wi-Fi credentials received");
         }
       } else {
@@ -318,53 +320,32 @@ void bluetoothconnect() {
   }
 }
 
-
-
 // Store last known WiFi credentials
-
-void saveWiFiCredentials() {
-  // Get the editor to modify preferences
-  preferences.begin("wifi", false);
-  Serial.println("const char creds before saving");
+void saveWiFiCredentials(const char* ssid, const char* password) {
+  preferences.begin("wifi", false); 
+  preferences.putString("ssid", ssid); // save the ssid to preferences
+  preferences.putString("password", password); // save the password to preferences
+  Serial.println("SAVED CREDS:");
   Serial.println(ssid);
   Serial.println(password);
-  // Store the SSID and password in preferences
-  preferences.putString("ssid", String(ssid));
-  preferences.putString("password", String(password));
-
-  // Commit the changes
   preferences.end();
+}
+
+void loadWiFiCredentials(char* savedssid, char* savedpassword) {
+  preferences.begin("wifi", true);
+  String saved_ssid = preferences.getString("ssid", "");
+  String saved_password = preferences.getString("password", "");
+  preferences.end();
+  strcpy(savedssid, saved_ssid.c_str());
+  strcpy(savedpassword, saved_password.c_str());
+  // Print the retrieved SSID and password for verification
+  Serial.println("Retrieved SSID: ");
+  Serial.println(savedssid);
+  Serial.println("Retrieved password");
+  Serial.println(savedpassword);
 }
 
 
 
 
-void loadWifiCredentials() {
-  // Get the preferences for "wifi"
-  preferences.begin("wifi", true);
 
-  // Load the SSID and password from preferences
-  ssid = preferences.getString("ssid").c_str();
-  password = preferences.getString("password").c_str();
-  Serial.println("const char creds loaded: ");
-  Serial.println(ssid);
-  Serial.println(password);
-  // Serial.println(ssid);
-  // Serial.println(password);
-  // Close the preferences
-  preferences.end();
-}
-
-
-/*void loadWiFiCredentials() {
-  // Open the preferences file with a namespace of "wifi" and read-only access
-  preferences.begin("wifi", true);
-
-  // Load the saved SSID and password from preferences, or use default values
-  savedssid = preferences.getString("ssid").c_str();
-  savedpassword = preferences.getString("password").c_str();
-
-  // Close the preferences file
-  preferences.end();
-  
-}*/
