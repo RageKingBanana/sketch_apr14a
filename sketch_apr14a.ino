@@ -1,29 +1,31 @@
 #include <WiFi.h>
+
 #include <BluetoothSerial.h>
+
 #include <Arduino.h>
+
 #include <FirebaseESP32.h>
-// Provide the token generation process info.
+ // Provide the token generation process info.
 #include <addons/TokenHelper.h>
-// Provide the RTDB payload printing info and other helper functions.
+ // Provide the RTDB payload printing info and other helper functions.
 #include <addons/RTDBHelper.h>
-// For the following credentials, see examples/Authentications/SignInAsUser/EmailPassword/EmailPassword.ino
+ // For the following credentials, see examples/Authentications/SignInAsUser/EmailPassword/EmailPassword.ino
 #include <Preferences.h>
-// Declare Preferences object
+ // Declare Preferences object
 Preferences preferences;
 //Preferences prefs;
 /* 2. Define the API Key */
 #define API_KEY "AIzaSyAKEou6JOvFfcgPt_G-W3cGXnGn-g8W82w"
 /* 3. Define the RTDB URL */
-#define DATABASE_URL "https://pyronnoia-280b1-default-rtdb.firebaseio.com/"  //<databaseName>.firebaseio.com or <databaseName>.<region>.firebasedatabase.app
+#define DATABASE_URL "https://pyronnoia-280b1-default-rtdb.firebaseio.com/" //<databaseName>.firebaseio.com or <databaseName>.<region>.firebasedatabase.app
 /* 4. Define the user Email and password that alreadey registerd or added in your project */
 #define USER_EMAIL "cHlyb25ub2lhZXNwMzJ0dGdvdGNhbGw@email.com"
 #define USER_PASSWORD "a!PQc;*?6rnCdHRE"
 #define WIFI_SSID "PLDTHOMEFIBR9K2X5"
 #define WIFI_PASSWORD "PLDTWIFIYBJrQ"
 
-
-#define SSID_MAX_LEN 32  // Maximum length of SSID (including null terminator)
-#define PASS_MAX_LEN 64  // Maximum length of password (including null terminator)
+#define SSID_MAX_LEN 32 // Maximum length of SSID (including null terminator)
+#define PASS_MAX_LEN 64 // Maximum length of password (including null terminator)
 
 // Define Firebase Data object
 FirebaseData fbdo;
@@ -44,23 +46,29 @@ bool startconn = true;
 // Define the pin for the IR flame sensor
 #define FLAME_PIN 32
 BluetoothSerial SerialBT;
-const char* default_ssid = "my_default_ssid";
-const char* default_password = "my_default_password";
-const char* ssid ="";
-const char* password= "";
-//char* savedssid ="";
-//char* savedpassword= "";
+const char * default_ssid = "my_default_ssid";
+const char * default_password = "my_default_password";
+const char * ssid = "";
+const char * password = "";
+//char ssid[32]; // assuming the length of the SSID is no more than 32 characters
+//char password[64]; // assuming the length of the password is no more than 64 characters;
 void firebaseSetup() {
-  bool isConnectedtoFB = false;  // flag to keep track of connection status
+  bool isConnectedtoFB = false; // flag to keep track of connection status
+  char ssid[32]; // assuming the length of the SSID is no more than 32 characters
+  char password[64]; // assuming the length of the password is no more than 64 characters
+  // Call the function to load saved credentials
+  loadWiFiCredentials(ssid, password);
   WiFi.begin(ssid, password);
   Serial.print("Firebase to Wi-Fi");
-
-  startTime = millis();  // set the start time
+  Serial.print(ssid);
+  Serial.print(password);
+  Serial.print("Firebase deets above");
+  startTime = millis(); // set the start time
 
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - startTime >= 10000) {  // connection timeout after 10 seconds
+    if (millis() - startTime >= 10000) { // connection timeout after 10 seconds
       Serial.println("Connection timed out.");
-      return;  // exit the function if connection times out
+      return; // exit the function if connection times out
     }
     delay(1000);
     Serial.print("!");
@@ -83,8 +91,8 @@ void firebaseSetup() {
   config.database_url = DATABASE_URL;
 
   /* Assign the callback function for the long running token generation task */
-  config.token_status_callback = tokenStatusCallback;  // see addons/TokenHelper.h
-  Firebase.begin(&config, &auth);
+  config.token_status_callback = tokenStatusCallback; // see addons/TokenHelper.h
+  Firebase.begin( & config, & auth);
 
   // Comment or pass false value when WiFi reconnection will control by your code or third party library
   Firebase.reconnectWiFi(true);
@@ -132,9 +140,11 @@ void loop() {
     //loadWifiCredentials();
     if (startconn) {
       SerialBT.end();
+      Serial.println("First BT end");
       bool checkconnect = connectToWifi();
       if (checkconnect) {
         startconn = false;
+        Serial.println("checkconnect true,startcon set false");
       } else {
         startconn = false;
         Serial.println(" failed Connecting to Wi-Fi network");
@@ -144,6 +154,7 @@ void loop() {
 
       if (!isBluetoothInitialized) {
         SerialBT.begin("PYRONNOIA");
+        WiFi.disconnect();
         server.stop();
         isBluetoothInitialized = true;
         if (!isBluetoothInitialized) {
@@ -158,11 +169,9 @@ void loop() {
 
       //}
       else {
-        bluetoothconnect();  // check for incoming messages
+        bluetoothconnect(); // check for incoming messages
       }
     }
-
-
 
   } else {
     // Load saved WiFi credentials
@@ -184,7 +193,6 @@ void loop() {
         while (client.connected()) {
           if (client.available()) {
             Serial.println("Sent response: Hello, client!");
-
             String message = client.readStringUntil('\r');
             Serial.println("entered wifi creds");
             int separatorIndex = message.indexOf(':');
@@ -194,30 +202,33 @@ void loop() {
               wifiName.trim();
               wifiPassword.trim();
               if (wifiName != "" && wifiPassword != "") {
-                Serial.println("Received Wi-Fi credentials:");
+                Serial.println("Received Wi-Fi credentials(WIFI):");
                 Serial.println("SSID: " + wifiName);
                 Serial.println("Password: " + wifiPassword);
                 ssid = wifiName.c_str();
                 password = wifiPassword.c_str();
+                startconn = false;
                 bool connected = connectToWifi();
                 if (!connected) {
+                  startconn = true;
                   Serial.println("Invalid Wi-Fi credentials received 1");
                 } else {
-                  Serial.println("VALID Wi-Fi credentials received 2");
+                  saveWiFiCredentials(ssid, password);
+                  Serial.println("VALID Wi-Fi credentials received ");
                 }
               } else {
-                Serial.println("Invalid Wi-Fi credentials received");
+                startconn = true;
+                Serial.println("Invalid Wi-Fi credentials received 2");
               }
             } else {
+              startconn = true;
               Serial.println("Invalid message received");
             }
           }
         }
         client.stop();
         Serial.println("Client disconnected");
-      } else {
-      }
-
+      } else {}
 
       if (Firebase.ready() && (millis() - sendDataPrevMillis > 1000 || sendDataPrevMillis == 0)) {
         sendDataPrevMillis = millis();
@@ -253,35 +264,29 @@ bool connectToWifi() {
   if (!startconn) {
     WiFi.begin(ssid, password);
   } else {
-char ssid[32]; // assuming the length of the SSID is no more than 32 characters
-char password[64]; // assuming the length of the password is no more than 64 characters
-// Call the function to load saved credentials
-loadWiFiCredentials(ssid, password);
-// Use the loaded credentials to connect to WiFi
-WiFi.begin(ssid, password);
-Serial.println("USING SAVED CREDS");
-Serial.print("SSID: ");
-Serial.println(ssid);
-Serial.print("Password: ");
-Serial.println(password);
-WiFi.begin(ssid, password);
-
+    char ssid[32]; // assuming the length of the SSID is no more than 32 characters
+    char password[64]; // assuming the length of the password is no more than 64 characters
+    // Call the function to load saved credentials
+    loadWiFiCredentials(ssid, password);
+    // Use the loaded credentials to connect to WiFi
+    Serial.println("USING SAVED CREDS");
+    Serial.print("SSID: ");
+    Serial.println(ssid);
+    Serial.print("Password: ");
+    Serial.println(password);
+    WiFi.begin(ssid, password);
   }
   Serial.println("Connecting to Wi-Fi network");
   startTime = millis();
   while (WiFi.status() != WL_CONNECTED) {
-    if (millis() - startTime >= 10000) {  // connection timeout after 10 seconds
+    if (millis() - startTime >= 10000) { // connection timeout after 10 seconds
       return false;
     }
     delay(1000);
     Serial.print("!");
   }
-
-
   return true;
 }
-
-
 
 void bluetoothconnect() {
   if (SerialBT.connected() && WiFi.status() != WL_CONNECTED) {
@@ -299,7 +304,7 @@ void bluetoothconnect() {
       wifiName.trim();
       wifiPassword.trim();
       if (wifiName != "" && wifiPassword != "") {
-        Serial.println("Received Wi-Fi credentials:");
+        Serial.println("Received Wi-Fi credentials(BT):");
         Serial.println("SSID: " + wifiName);
         Serial.println("Password: " + wifiPassword);
         ssid = wifiName.c_str();
@@ -321,8 +326,8 @@ void bluetoothconnect() {
 }
 
 // Store last known WiFi credentials
-void saveWiFiCredentials(const char* ssid, const char* password) {
-  preferences.begin("wifi", false); 
+void saveWiFiCredentials(const char * ssid, const char * password) {
+  preferences.begin("wifi", false);
   preferences.putString("ssid", ssid); // save the ssid to preferences
   preferences.putString("password", password); // save the password to preferences
   Serial.println("SAVED CREDS:");
@@ -331,7 +336,7 @@ void saveWiFiCredentials(const char* ssid, const char* password) {
   preferences.end();
 }
 
-void loadWiFiCredentials(char* savedssid, char* savedpassword) {
+void loadWiFiCredentials(char * savedssid, char * savedpassword) {
   preferences.begin("wifi", true);
   String saved_ssid = preferences.getString("ssid", "");
   String saved_password = preferences.getString("password", "");
@@ -344,8 +349,3 @@ void loadWiFiCredentials(char* savedssid, char* savedpassword) {
   Serial.println("Retrieved password");
   Serial.println(savedpassword);
 }
-
-
-
-
-
