@@ -40,9 +40,10 @@ unsigned long count = 0;
 bool isBluetoothInitialized = false;
 unsigned long startTime = millis();
 bool startconn = true;
+int connectedstatus=1;
 // Define the analog pins for the sensors
-#define MQ2_PIN 34
-#define MQ135_PIN 14
+#define MQ2_PIN 34 //34
+#define MQ135_PIN 33 //27
 // Define the pin for the IR flame sensor
 #define FLAME_PIN 32
 BluetoothSerial SerialBT;
@@ -153,6 +154,7 @@ void loop() {
     } else {
 
       if (!isBluetoothInitialized) {
+        connectedstatus = 0;
         SerialBT.begin("PYRONNOIA");
         WiFi.disconnect();
         server.stop();
@@ -192,7 +194,7 @@ void loop() {
         Serial.println("Client connected");
         while (client.connected()) {
           if (client.available()) {
-            Serial.println("Sent response: Hello, client!");
+            Serial.println("Sent response: Hello, Ricky!");
             String message = client.readStringUntil('\r');
             Serial.println("entered wifi creds");
             int separatorIndex = message.indexOf(':');
@@ -237,7 +239,6 @@ void loop() {
         float mq2 = readMQ2();
         float mq135 = readMQ135();
         bool flame = readFlame();
-
         // Display the sensor values in the serial monitor
         Serial.print("MQ-2 Sensor PPM: ");
         Serial.println(mq2);
@@ -246,7 +247,14 @@ void loop() {
         Serial.print("Flame Detected: ");
         Serial.println(flame);
 
+      // Increment the count and reset to 1 if it reaches 5
+    connectedstatus++;
+    if (connectedstatus > 5) {
+      connectedstatus = 1;
+     
+    }
         // Upload to firebase
+        Serial.printf("Set Connection Status... %s\n", Firebase.setFloat(fbdo, "/Sensor Data/" + std::string(auth.token.uid.c_str()) + "/connected", connectedstatus) ? "ok" : fbdo.errorReason().c_str());
         Serial.printf("Set MQ-2 Sensor PPM... %s\n", Firebase.setFloat(fbdo, "/Sensor Data/" + std::string(auth.token.uid.c_str()) + "/mq2", mq2) ? "ok" : fbdo.errorReason().c_str());
         Serial.printf("Set MQ-135 Sensor PPM... %s\n", Firebase.setFloat(fbdo, "/Sensor Data/" + std::string(auth.token.uid.c_str()) + "/mq135", mq135) ? "ok" : fbdo.errorReason().c_str());
         Serial.printf("Set Flame Detected... %s\n", Firebase.setBool(fbdo, "/Sensor Data/" + std::string(auth.token.uid.c_str()) + "/flame", flame) ? "ok" : fbdo.errorReason().c_str());
@@ -256,6 +264,8 @@ void loop() {
       }
     }
   }
+
+     
 }
 
 bool connectToWifi() {
